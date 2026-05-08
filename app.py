@@ -2,66 +2,119 @@ import streamlit as st
 from anthropic import Anthropic
 import pypdf
 
-# 페이지 설정
-st.set_page_config(page_title="AI 문서 Q&A", page_icon="🤖")
+# Page configuration
+st.set_page_config(
+    page_title="AI Document Q&A",
+    page_icon="🤖",
+    layout="wide"
+)
 
-# 제목
-st.title("🤖 AI 문서 질의응답 시스템")
+# Title and description
+st.title("🤖 AI Document Q&A System")
+st.markdown("Upload a PDF document and ask questions about its content using Claude AI")
 st.markdown("---")
 
-# API 키 가져오기
-# 배포 시: Streamlit secrets 사용
-# 로컬 시: 사이드바 입력
+# API key handling
+# Deployment: Use Streamlit secrets
+# Local: Use sidebar input
 try:
     api_key = st.secrets["ANTHROPIC_API_KEY"]
-    st.sidebar.success("✅ API 키 연결됨")
+    st.sidebar.success("✅ API Key Connected")
 except:
     with st.sidebar:
-        st.header("⚙️ 설정")
+        st.header("⚙️ Settings")
         api_key = st.text_input(
             "Claude API Key", 
             type="password",
-            help="https://platform.claude.com 에서 발급받으세요"
+            help="Get your API key from https://platform.claude.com"
         )
         
         if api_key:
-            st.success("✅ API 키 입력됨")
+            st.success("✅ API Key Entered")
         else:
-            st.warning("⚠️ API 키를 입력하세요")
+            st.warning("⚠️ Please enter your API key")
 
-# PDF 업로드
-uploaded_file = st.file_uploader(
-    "📄 PDF 파일을 업로드하세요", 
-    type=['pdf']
-)
+# Add info sidebar
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 📖 About")
+    st.markdown("""
+    This application uses Claude AI to answer questions about your PDF documents.
+    
+    **Features:**
+    - PDF text extraction
+    - AI-powered Q&A
+    - Natural language processing
+    
+    **Tech Stack:**
+    - Streamlit
+    - Claude API
+    - pypdf
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 🔗 Links")
+    st.markdown("[GitHub](https://github.com/hangguma/ai-document-qa)")
+    st.markdown("[Live Demo](https://ai-document-q-a.streamlit.app)")
 
-# PDF 텍스트 추출
+# Main content area
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    # PDF upload
+    uploaded_file = st.file_uploader(
+        "📄 Upload your PDF document", 
+        type=['pdf'],
+        help="Select a PDF file to analyze"
+    )
+
+with col2:
+    if uploaded_file:
+        st.metric(
+            label="Document Status",
+            value="Ready",
+            delta="Uploaded"
+        )
+
+# PDF text extraction
 if uploaded_file:
     try:
-        # PDF 읽기
+        # Read PDF
         pdf_reader = pypdf.PdfReader(uploaded_file)
         
-        # 전체 텍스트 추출
+        # Extract all text
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text()
         
-        # 텍스트 미리보기
-        with st.expander("📖 문서 미리보기"):
+        # Document preview
+        with st.expander("📖 Document Preview (First 500 characters)"):
             st.text(text[:500] + "...")
         
-        st.success(f"✅ PDF 로드 완료! (총 {len(pdf_reader.pages)}페이지)")
+        st.success(f"✅ Document loaded successfully! ({len(pdf_reader.pages)} pages)")
         
-        # 질문 입력
+        # Question input
         st.markdown("---")
-        question = st.text_input("💬 질문을 입력하세요:")
+        st.subheader("💬 Ask a Question")
         
-        # 답변 생성
+        question = st.text_input(
+            "Enter your question about the document:",
+            placeholder="e.g., What is the main topic of this document?"
+        )
+        
+        # Answer generation
         if question and api_key:
-            if st.button("🚀 답변 받기", type="primary"):
-                with st.spinner("AI가 생각 중..."):
+            col1, col2, col3 = st.columns([1, 1, 3])
+            with col1:
+                generate_button = st.button("🚀 Get Answer", type="primary", use_container_width=True)
+            with col2:
+                if st.button("🔄 Clear", use_container_width=True):
+                    st.rerun()
+            
+            if generate_button:
+                with st.spinner("🤔 Claude is thinking..."):
                     try:
-                        # Claude API 호출
+                        # Call Claude API
                         client = Anthropic(api_key=api_key)
                         
                         message = client.messages.create(
@@ -69,28 +122,80 @@ if uploaded_file:
                             max_tokens=1024,
                             messages=[{
                                 "role": "user",
-                                "content": f"""다음 문서를 읽고 질문에 답변해주세요.
+                                "content": f"""Please read the following document and answer the question based on its content.
 
-문서 내용:
+Document Content:
 {text[:3000]}
 
-질문: {question}
+Question: {question}
 
-답변은 한국어로, 문서 내용을 기반으로 정확하게 답변해주세요."""
+Please provide an accurate answer based solely on the information in the document. If the answer cannot be found in the document, please state that clearly."""
                             }]
                         )
                         
-                        # 답변 표시
-                        st.markdown("### 🤖 AI 답변:")
-                        st.write(message.content[0].text)
+                        # Display answer
+                        st.markdown("---")
+                        st.markdown("### 🤖 Claude's Answer:")
+                        
+                        # Answer box with nice formatting
+                        st.info(message.content[0].text)
+                        
+                        # Additional info
+                        with st.expander("ℹ️ Response Details"):
+                            st.write(f"**Model:** {message.model}")
+                            st.write(f"**Tokens Used:** {message.usage.input_tokens} input, {message.usage.output_tokens} output")
                         
                     except Exception as e:
-                        st.error(f"❌ 오류 발생: {str(e)}")
+                        st.error(f"❌ Error: {str(e)}")
+                        st.info("💡 Tip: Check your API key and try again")
         
         elif question and not api_key:
-            st.warning("⚠️ API 키를 먼저 입력하세요!")
+            st.warning("⚠️ Please enter your API key in the sidebar first!")
             
     except Exception as e:
-        st.error(f"❌ PDF 읽기 오류: {str(e)}")
+        st.error(f"❌ Error reading PDF: {str(e)}")
+        st.info("💡 Tip: Make sure your PDF is not encrypted or corrupted")
 else:
-    st.info("👆 PDF 파일을 업로드해주세요")
+    # Welcome message when no file is uploaded
+    st.info("👆 Please upload a PDF document to get started")
+    
+    # Example use cases
+    st.markdown("### 🎯 Example Use Cases")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        **📚 Research Papers**
+        - Summarize key findings
+        - Extract methodology
+        - Find specific data
+        """)
+    
+    with col2:
+        st.markdown("""
+        **📋 Reports**
+        - Answer specific questions
+        - Extract statistics
+        - Find recommendations
+        """)
+    
+    with col3:
+        st.markdown("""
+        **📄 Documents**
+        - Understand content
+        - Find information
+        - Get insights
+        """)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center'>
+    <p>Built with ❤️ using Streamlit and Claude AI</p>
+    <p>
+        <a href="https://github.com/hangguma/ai-document-qa" target="_blank">GitHub</a> | 
+        <a href="https://platform.claude.com" target="_blank">Claude API</a> | 
+        <a href="https://streamlit.io" target="_blank">Streamlit</a>
+    </p>
+</div>
+""", unsafe_allow_html=True)
