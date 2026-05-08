@@ -148,8 +148,6 @@ This project is [MIT](LICENSE) licensed.
 hangguma
 
 - GitHub: [@hangguma](https://github.com/hangguma)
-- LinkedIn: [Your LinkedIn]
-- Portfolio: [Your Website]
 
 ## 🙏 Acknowledgments
 
