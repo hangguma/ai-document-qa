@@ -1,0 +1,19 @@
+# Virtual Environment
+venv/
+env/
+
+# Secrets (절대 GitHub에 올리지 않음!)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
