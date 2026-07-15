@@ -2,6 +2,13 @@ import streamlit as st
 from anthropic import Anthropic
 import pypdf
 
+# Claude Sonnet 4.6 pricing (USD per million tokens), as of 2026-07.
+# Pricing is per-model and not exposed via API — verify at
+# https://platform.claude.com/docs/en/pricing when changing the model below.
+PRICE_PER_M_INPUT = 3.00
+PRICE_PER_M_OUTPUT = 15.00
+PRICING_AS_OF = "2026-07"
+
 # Page configuration
 st.set_page_config(
     page_title="AI Document Q&A",
@@ -140,10 +147,39 @@ Please provide an accurate answer based solely on the information in the documen
                         # Answer box with nice formatting
                         st.info(message.content[0].text)
                         
+                        # Cost calculation
+                        input_cost = message.usage.input_tokens / 1_000_000 * PRICE_PER_M_INPUT
+                        output_cost = message.usage.output_tokens / 1_000_000 * PRICE_PER_M_OUTPUT
+                        query_cost = input_cost + output_cost
+
+                        # Track cumulative session cost
+                        st.session_state.total_cost = st.session_state.get("total_cost", 0.0) + query_cost
+                        st.session_state.query_count = st.session_state.get("query_count", 0) + 1
+
                         # Additional info
                         with st.expander("ℹ️ Response Details"):
                             st.write(f"**Model:** {message.model}")
                             st.write(f"**Tokens Used:** {message.usage.input_tokens} input, {message.usage.output_tokens} output")
+                            st.write(
+                                f"**Cost:** \\${query_cost:.6f} "
+                                f"(input \\${input_cost:.6f} + output \\${output_cost:.6f})"
+                            )
+                            st.write(
+                                f"**Session Total:** \\${st.session_state.total_cost:.6f} "
+                                f"across {st.session_state.query_count} "
+                                f"{'query' if st.session_state.query_count == 1 else 'queries'}"
+                            )
+                            st.caption(
+                                "Every question re-sends the document as input tokens — "
+                                "the document is the recurring cost, not the question."
+                            )
+                            st.caption(
+                                f"Cost is an estimate based on Claude Sonnet 4.6 pricing "
+                                f"as of {PRICING_AS_OF}: \\${PRICE_PER_M_INPUT:.2f} input / "
+                                f"\\${PRICE_PER_M_OUTPUT:.2f} output per 1M tokens. "
+                                f"Actual billing may differ — see the "
+                                f"[official pricing page](https://platform.claude.com/docs/en/pricing)."
+                            )
                         
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
